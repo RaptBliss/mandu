@@ -19,8 +19,27 @@ function hasHttpMethodHandlers(module: RouteModule): boolean {
 }
 
 function createMethodDispatcher(module: RouteModule, routeId: string) {
+  const allowedMethods = HTTP_METHODS.filter((m) => typeof module[m] === "function");
+  const allowHeader = allowedMethods.join(", ");
+
   return async (req: Request, params: Record<string, string> = {}) => {
-    const method = req.method.toUpperCase() as HttpMethod;
+    const rawMethod = req.method.toUpperCase();
+
+    if (!HTTP_METHODS.includes(rawMethod as HttpMethod)) {
+      return Response.json(
+        {
+          error: `Method ${rawMethod} not allowed for route ${routeId}`,
+        },
+        {
+          status: 405,
+          headers: {
+            Allow: allowHeader,
+          },
+        }
+      );
+    }
+
+    const method = rawMethod as HttpMethod;
     const handler = module[method] as
       | ((request: Request, context?: { params: Record<string, string> }) => Response | Promise<Response>)
       | undefined;
@@ -33,7 +52,7 @@ function createMethodDispatcher(module: RouteModule, routeId: string) {
         {
           status: 405,
           headers: {
-            Allow: HTTP_METHODS.filter((m) => typeof module[m] === "function").join(", "),
+            Allow: allowHeader,
           },
         }
       );
